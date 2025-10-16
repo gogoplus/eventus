@@ -76,10 +76,145 @@ go mod tidy
 go build ./...
 
 
-Eventus is a production-ready Go library implementing:
-- Durable outbox pattern (BadgerDB)
-- Transactional publish (Append -> Publish -> MarkCommitted)
-- Kafka adapter (segmentio/kafka-go)
-- Recovery worker that ensures eventual delivery
+Quickstart — Mock mode (no Kafka)
 
-See /docs for full usage, architecture, and contribution guidelines.
+Mock mode is useful for local demos and CI without a running Kafka instance.
+
+Linux / macOS (bash)
+cd eventus
+go test ./internal/core -v           # unit tests for the core store
+# run the producer in mock mode (writer does not connect to Kafka)
+go run ./cmd/eventus-producer --mock
+# run consumer (reads committed events from local store)
+go run ./cmd/eventus-consumer --mock
+
+Windows (PowerShell)
+cd eventus
+go test ./internal/core -v
+go run ./cmd/eventus-producer --mock
+go run ./cmd/eventus-consumer --mock
+
+
+In --mock mode the producer writes and marks committed locally; nothing is published to Kafka.
+
+Quickstart — Real Kafka (Docker Compose)
+
+Start Kafka and Zookeeper using the supplied Docker Compose:
+
+cd examples/kafka/real
+docker-compose up -d
+sleep 8    # give Kafka time to start
+cd ../../..
+go run ./cmd/eventus-producer --brokers=localhost:9092 --topic=eventus.example
+go run ./cmd/eventus-consumer --brokers=localhost:9092 --topic=eventus.example
+
+
+Stop services:
+
+cd examples/kafka/real
+docker-compose down
+
+Example usage (programmatic API)
+
+Use pkg/eventus to integrate Eventus into applications.
+
+Minimal producer example
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/gogoplus/eventus/internal/core"
+    "github.com/gogoplus/eventus/pkg/eventus"
+)
+
+func main() {
+    // Open local badger-backed store (path: ./data)
+    store, err := core.NewStore("./data")
+    if err != nil {
+        log.Fatalf("open store: %v", err)
+    }
+    defer store.Close()
+
+    // Create manager with Kafka brokers and topic
+    mgr, err := eventus.NewManager(store, "localhost:9092", "eventus.example")
+    if err != nil {
+        log.Fatalf("new manager: %v", err)
+    }
+
+    // Publish an event and commit
+    ev := core.Event{Type: "UserCreated", Data: []byte(`{"id": 123, "name":"alice"}`)}
+    seq, err := mgr.PublishAndCommit(context.Background(), ev)
+    if err != nil {
+        log.Fatalf("publish failed: %v", err)
+    }
+    fmt.Printf("Published seq=%d\n", seq)
+}
+
+Starting the retry worker
+ctx := context.Background()
+mgr.StartRetry(ctx)    // background worker starts scanning pending envelopes
+// later...
+mgr.StopRetry()
+
+CLI examples (producer & consumer)
+Producer (example options)
+# mock mode (no Kafka)
+go run ./cmd/eventus-producer --mock
+
+# real Kafka brokers and topic
+go run ./cmd/eventus-producer --brokers=localhost:9092 --topic=eventus.example
+
+Consumer (reads committed events from store)
+# consumer reading local committed events
+go run ./cmd/eventus-consumer --topic=eventus.example --brokers=localhost:9092
+
+API Reference (summary)
+
+See pkg/eventus/manager.go for public API details.
+
+Types
+
+core.Event — the event payload
+
+type Event struct {
+    Type string          `json:"type"`
+    Data json.RawMessage `json:"data"`
+}
+
+
+core.Envelope — persisted metadata wrapper
+
+type Envelope struct {
+    Seq       uint64
+    When      int64
+    Committed bool
+    Ev        Event
+}
+
+
+Key functions/methods
+
+core.NewStore(dir string) (*Store, error) — open/create DB
+
+(*Store) AppendPending(ctx context.Context, ev Event) (uint64, error) — append uncommitted
+
+(*Store) MarkCommitted(ctx context.Context, seq uint64) error — mark committed
+
+tx.New(store, publisher) — create transaction manager
+
+pub.NewPublisher(brokers, topic) — Kafka publisher
+
+pkg/eventus.NewManager(store, brokers, topic) — convenience wrapper
+
+(*Manager) PublishAndCommit(ctx, ev) — append/publish/commit (atomic in app-level ordering)
+
+Testing & CI
+Run locally
+go mod tidy
+go test ./... -v
+
+
+
