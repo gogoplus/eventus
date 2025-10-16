@@ -15,21 +15,7 @@
 - [Quick Installation](#quick-installation)
   - [Prerequisites](#prerequisites)
   - [Clone and build (fast)](#clone-and-build-fast)
-- [Quickstart — Mock mode (no Kafka)](#quickstart---mock-mode-no-kafka)
-  - [Linux / macOS (bash)](#linux--macos-bash)
-  - [Windows (PowerShell)](#windows-powershell)
-- [Quickstart — Real Kafka (Docker)](#quickstart---real-kafka-docker)
-- [Example usage (programmatic API)](#example-usage-programmatic-api)
-- [CLI examples (producer & consumer)](#cli-examples-producer--consumer)
-- [API Reference (summary)](#api-reference-summary)
-- [Testing & CI](#testing--ci)
-- [Preparing the repo for GitHub (step-by-step)](#preparing-the-repo-for-github-step-by-step)
-  - [Initialize, commit, push to empty repo](#initialize-commit-push-to-empty-repo)
-  - [Create a GitHub Release (manual / `gh` / REST API)](#create-a-github-release-manual--gh--rest-api)
-- [Contributing & CODE_OF_CONDUCT](#contributing--code_of_conduct)
-- [Troubleshooting & FAQ](#troubleshooting--faq)
-- [Roadmap & Governance](#roadmap--governance)
-- [License](#license)
+
 
 ---
 
